@@ -1,3 +1,4 @@
+; glitch.pio
 ; Slam (01/04/2025)
 ;
 ; This program is free software; you can redistribute it and/or modify it
@@ -12,6 +13,10 @@
 ; You should have received a copy of the GNU General Public License
 ; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+; glitch.pio
+; Genera un pulso de glitch con retardo y ancho configurables
+; Recibe el retardo (en ciclos) y luego el ancho (en ciclos) desde el FIFO.
+
 .program glitch
 
 ; Registros utilizados:
@@ -19,28 +24,53 @@
 ; - x: Contador para el ancho del pulso
 
 .wrap_target
-    pull        ; Carga el retardo desde FIFO → temp
-    mov y, status     ; Mover retardo a Y
+    pull block         ; Espera el retardo desde FIFO → OSR
+    mov y, osr         ; Mueve el retardo a Y
 
-    pull        ; Carga el ancho desde FIFO → temp
-    mov x, status     ; Mover ancho a X
-
-    ; Esperar retardo
 delay_loop:
     jmp y-- delay_loop
-    nop             ; No hay side-set, se usa nop para mantener la sincronización
 
-    ; Generar pulso de glitch (HIGH)
-    set pins, 1
+    set pins, 1        ; Activa el pin de glitch (HIGH)
 
-    ; Mantener pulso por 'X' ciclos
+    pull block         ; Espera el ancho desde FIFO → OSR
+    mov x, osr         ; Mueve el ancho a X
+
 pulse_loop:
     jmp x-- pulse_loop
-    nop             ; No hay side-set, se usa nop para mantener la sincronización
+
+    set pins, 0        ; Desactiva el pin de glitch (LOW)
+.wrap
+
+
+;.program glitch
+
+; Registros utilizados:
+; - y: Contador para el retardo
+; - x: Contador para el ancho del pulso
+
+;.wrap_target
+;    pull        ; Carga el retardo desde FIFO → temp
+;    mov y, status     ; Mover retardo a Y
+
+;    pull        ; Carga el ancho desde FIFO → temp
+;    mov x, status     ; Mover ancho a X
+
+    ; Esperar retardo
+;delay_loop:
+;    jmp y-- delay_loop
+;    nop             ; No hay side-set, se usa nop para mantener la sincronización
+
+    ; Generar pulso de glitch (HIGH)
+;    set pins, 1
+
+    ; Mantener pulso por 'X' ciclos
+;pulse_loop:
+;    jmp x-- pulse_loop
+;    nop             ; No hay side-set, se usa nop para mantener la sincronización
 
     ; Finalizar pulso (LOW)
-    set pins, 0
-.wrap
+;    set pins, 0
+;.wrap
 
 ;.program glitch
 

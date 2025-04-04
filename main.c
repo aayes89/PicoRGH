@@ -1,6 +1,10 @@
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "hardware/clocks.h"
+#include "hardware/pio.h"
+#include "hardware/irq.h"
+#include "hardware/sync.h"
+#include "glitch.pio.h"  // Archivo generado desde el código PIO
 
 // Definición de pines
 #ifndef PICO_DEFAULT_LED_PIN // LED integrado del RPi Pico
@@ -8,11 +12,6 @@
 #else
     #define LED_PIN PICO_DEFAULT_LED_PIN
 #endif
-#include "pico/stdlib.h"
-#include "hardware/pio.h"
-#include "hardware/irq.h"
-#include "hardware/sync.h"
-#include "glitch.pio.h"  // Archivo generado desde el código PIO
 
 // Configuración de pines
 #define CPU_RESET_PIN    0 // RST_CPU - [R8C2 | J8C1 Pin2 ](TOP) || [C7R112] (BOTTOM)
@@ -24,7 +23,7 @@
 
 volatile bool trigger_glitch = false;
 PIO glitch_pio = pio0;
-uint glitch_sm = 0;
+uint glitch_sm;
 
 // Interrupción para detectar el reset
 void gpio_irq_handler(uint gpio, uint32_t events) {
@@ -41,20 +40,24 @@ void init_glitch_pio() {
     sm_config_set_out_pins(&cfg, GLITCH_OUT_PIN, 1);
     sm_config_set_clkdiv(&cfg, 1.0);  // 125 MHz → 8 ns/ciclo
     
-    pio_sm_init(glitch_pio, glitch_sm, offset, &cfg);
+    glitch_sm = pio_claim_sm(glitch_pio);
+	pio_sm_init(glitch_pio, glitch_sm, offset, &cfg);
     pio_sm_set_enabled(glitch_pio, glitch_sm, true);
 }
 
 int main() {
+	// Inicializar hardware básico
+	stdio_init_all();
+	
     // Inicializar hardware (sin stdio)
     gpio_init(CPU_RESET_PIN);
     gpio_init(GLITCH_OUT_PIN);
     gpio_init(LED_PIN);    
     
-    gpio_set_dir(CPU_RESET_PIN, GPIO_IN);
-    gpio_set_dir(GLITCH_OUT_PIN, GPIO_OUT);
+    gpio_set_dir(CPU_RESET_PIN, GPIO_IN);    
     gpio_set_dir(LED_PIN, GPIO_OUT);    
-    
+    gpio_set_function(GLITCH_OUT_PIN, GPIO_FUNC_PIO0);
+	
     // Configurar interrupción
     gpio_set_irq_enabled_with_callback(CPU_RESET_PIN, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
     
@@ -70,11 +73,7 @@ int main() {
             pio_sm_put_blocking(glitch_pio, glitch_sm, GLITCH_WIDTH_CYCLES);
             gpio_put(LED_PIN, 0);  // Apaga el LED
             trigger_glitch = false;
-        } else {
-            // LED rojo cuando no hay glitch
-            gpio_put(LED_PIN, 0);  // Apaga el LED verde            
-        }
-        
+        }         
         __wfi();  // Pone el microcontrolador en modo de espera activa
     }
 }
