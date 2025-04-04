@@ -7,7 +7,7 @@ pico_sdk_init()
 add_executable(glitcher main.c)
 
 # Agregar archivo PIO
-pico_generate_pio_header(glitcher glitch.pio)
+pico_generate_pio_header(glitcher ${CMAKE_CURRENT_LIST_DIR}/glitch.pio)
 
 # Enlazar con bibliotecas necesarias
 target_link_libraries(glitcher pico_stdlib hardware_gpio hardware_clocks hardware_pio hardware_sync hardware_irq)
