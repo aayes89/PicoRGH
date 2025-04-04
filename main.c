@@ -39,15 +39,27 @@ void glitch_init() {
 
 // Generar un pulso de reset
 void send_glitch_pulse() {
+    pico_set_led(true);  // Enciende LED al iniciar el pulso
     gpio_put(RESET_PIN, 1); // Activar reset
-    pico_set_led(true);
+
+    // Verificar que el reloj del sistema está configurado
+    uint32_t clk_hz = clock_get_hz(clk_sys);
+    if (clk_hz == 0) {
+        clk_hz = 125000000; // Valor por defecto si falla la lectura
+    }
 
     // Calcular los ciclos de espera para 100 ns
-    uint32_t delay_cycles = (clock_get_hz(clk_sys) / 10000000) * GLITCH_PULSE_NS / 100;
+    uint32_t delay_cycles = (clk_hz / 10000000) * GLITCH_PULSE_NS / 100;
+
+    // Si el valor es muy pequeño, forzar mínimo 1 ciclo
+    if (delay_cycles < 1) {
+        delay_cycles = 1;
+    }
+
     busy_wait_at_least_cycles(delay_cycles);
 
     gpio_put(RESET_PIN, 0); // Desactivar reset
-    pico_set_led(false);
+    pico_set_led(false);  // Apagar LED
 }
 
 // Monitorear POST y enviar el glitch
@@ -61,7 +73,9 @@ void perform_glitch() {
 }
 
 int main() {
-    stdio_init_all();
+    // Configurar el reloj manualmente
+    set_sys_clock_khz(125000, true);
+
     glitch_init();
     pico_led_init();  // Inicializar LED
 
