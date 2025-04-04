@@ -1,7 +1,7 @@
 #include "pico/stdlib.h"
+#include "hardware/pio.h"
 #include "hardware/gpio.h"
 #include "hardware/clocks.h"
-#include "hardware/pio.h"
 #include "hardware/irq.h"
 #include "hardware/sync.h"
 #include "glitch.pio.h"  // Archivo generado desde el código PIO
@@ -40,7 +40,8 @@ void init_glitch_pio() {
     sm_config_set_out_pins(&cfg, GLITCH_OUT_PIN, 1);
     sm_config_set_clkdiv(&cfg, 1.0);  // 125 MHz → 8 ns/ciclo
     
-    glitch_sm = pio_claim_sm(glitch_pio);
+    glitch_sm = pio_claim_unused_sm(glitch_pio, true);
+	//pio_claim_sm_mask(glitch_pio, 1u << glitch_sm);
 	pio_sm_init(glitch_pio, glitch_sm, offset, &cfg);
     pio_sm_set_enabled(glitch_pio, glitch_sm, true);
 }
