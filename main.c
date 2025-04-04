@@ -3,8 +3,10 @@
 #include "hardware/clocks.h"
 
 // Definición de pines
-
-#ifndef PICO_DEFAULT_LED_PIN
+#ifndef PICO_DEFAULT_LED_PIN // LED integrado del RPi Pico
+    #define LED_PIN 25
+#else
+    #define LED_PIN PICO_DEFAULT_LED_PIN
 #endif
 
 #define RESET_PIN 0  // Conectar al pin RST de la CPU de la Xbox 360
@@ -16,29 +18,21 @@
 
 // Inicializar GPIO para el LED
 void pico_led_init(void) {
-#ifdef PICO_DEFAULT_LED_PIN
-    // utiliza la funcionalidad de GPIO para encender o apagar el LED
-    gpio_init(PICO_DEFAULT_LED_PIN);
-    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-#endif
+    gpio_init(LED_PIN);
+    gpio_set_dir(LED_PIN, GPIO_OUT);
 }
 
 // Encender y apagar LED
 void pico_set_led(bool led_on) {
-#if defined(PICO_DEFAULT_LED_PIN)
-    // Establece el estado a ON/OFF
-    gpio_put(PICO_DEFAULT_LED_PIN, led_on);
-#endif
+    gpio_put(LED_PIN, led_on);
 }
 
 // Configuración inicial
 void glitch_init() {
-    // Configurar RESET como salida
     gpio_init(RESET_PIN);
     gpio_set_dir(RESET_PIN, GPIO_OUT);
     gpio_put(RESET_PIN, 0); // Estado inicial bajo
 
-    // Configurar POST como entrada
     gpio_init(POST_PIN);
     gpio_set_dir(POST_PIN, GPIO_IN);
 }
@@ -47,35 +41,32 @@ void glitch_init() {
 void send_glitch_pulse() {
     gpio_put(RESET_PIN, 1); // Activar reset
     pico_set_led(true);
-    //sleep_ns(GLITCH_PULSE_NS); // Duración del pulso (100 ns)
-    busy_wait_at_least_cycles(GLITCH_PULSE_NS * (clock_get_hz(clk_sys) / 1000000000));
+
+    // Calcular los ciclos de espera para 100 ns
+    uint32_t delay_cycles = (clock_get_hz(clk_sys) / 10000000) * GLITCH_PULSE_NS / 100;
+    busy_wait_at_least_cycles(delay_cycles);
+
     gpio_put(RESET_PIN, 0); // Desactivar reset
     pico_set_led(false);
 }
 
 // Monitorear POST y enviar el glitch
 void perform_glitch() {
-    // Esperar a que POST cambie (indica que la consola está arrancando)
     while (!gpio_get(POST_PIN)) {
-        sleep_us(1); // Polling simple, ajustar según necesidad
+        sleep_us(1); // Polling simple
     }
 
-    // Retardo antes del glitch (ajustar según timing de Xenon)
     sleep_us(GLITCH_DELAY_US);
-
-    // Enviar el pulso de glitch
     send_glitch_pulse();
 }
 
 int main() {
     stdio_init_all();
     glitch_init();
+    pico_led_init();  // Inicializar LED
 
     while (true) {
-        // Intentar el glitch en cada ciclo de arranque
         perform_glitch();
-
-        // Esperar un tiempo antes de intentar de nuevo (evitar bucles rápidos)
         sleep_ms(1000); // 1 segundo entre intentos
     }
 }
