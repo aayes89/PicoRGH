@@ -8,79 +8,73 @@
 #else
     #define LED_PIN PICO_DEFAULT_LED_PIN
 #endif
+#include "pico/stdlib.h"
+#include "hardware/pio.h"
+#include "hardware/irq.h"
+#include "hardware/sync.h"
+#include "glitch.pio.h"  // Archivo generado desde el código PIO
 
-#define RESET_PIN 0  // Conectar al pin RST de la CPU de la Xbox 360
-#define POST_PIN  1  // Conectar a un pin POST_OUT (ej. POSTBIT 0-7) para sincronización
+// Configuración de pines
+#define CPU_RESET_PIN    0 // RST_CPU - [R8C2 | J8C1 Pin2 ](TOP) || [C7R112] (BOTTOM)
+#define GLITCH_OUT_PIN   1 // POST - FT6U1 (TOP|BOTTOM) || FT6U7 (BOTTOM) 
 
-// Parámetros del glitch (ajustables)
-#define GLITCH_DELAY_US 5000  // Retardo inicial en microsegundos antes del pulso (aproximado para Xenon)
-#define GLITCH_PULSE_NS 100   // Duración del pulso en nanosegundos (100 ns típico para RGH)
+// Parámetros del glitch
+#define GLITCH_DELAY_CYCLES  20
+#define GLITCH_WIDTH_CYCLES  3
 
-// Inicializar GPIO para el LED
-void pico_led_init(void) {
-    gpio_init(LED_PIN);
-    gpio_set_dir(LED_PIN, GPIO_OUT);
-}
+volatile bool trigger_glitch = false;
+PIO glitch_pio = pio0;
+uint glitch_sm = 0;
 
-// Encender y apagar LED
-void pico_set_led(bool led_on) {
-    gpio_put(LED_PIN, led_on);
-}
-
-// Configuración inicial
-void glitch_init() {
-    gpio_init(RESET_PIN);
-    gpio_set_dir(RESET_PIN, GPIO_OUT);
-    gpio_put(RESET_PIN, 0); // Estado inicial bajo
-
-    gpio_init(POST_PIN);
-    gpio_set_dir(POST_PIN, GPIO_IN);
-}
-
-// Generar un pulso de reset
-void send_glitch_pulse() {
-    pico_set_led(true);  // Enciende LED al iniciar el pulso
-    gpio_put(RESET_PIN, 1); // Activar reset
-
-    // Verificar que el reloj del sistema está configurado
-    uint32_t clk_hz = clock_get_hz(clk_sys);
-    if (clk_hz == 0) {
-        clk_hz = 125000000; // Valor por defecto si falla la lectura
+// Interrupción para detectar el reset
+void gpio_irq_handler(uint gpio, uint32_t events) {
+    if (gpio == CPU_RESET_PIN && (events & GPIO_IRQ_EDGE_FALL)) {
+        trigger_glitch = true;
     }
-
-    // Calcular los ciclos de espera para 100 ns
-    uint32_t delay_cycles = (clk_hz / 10000000) * GLITCH_PULSE_NS / 100;
-
-    // Si el valor es muy pequeño, forzar mínimo 1 ciclo
-    if (delay_cycles < 1) {
-        delay_cycles = 1;
-    }
-
-    busy_wait_at_least_cycles(delay_cycles);
-
-    gpio_put(RESET_PIN, 0); // Desactivar reset
-    pico_set_led(false);  // Apagar LED
 }
 
-// Monitorear POST y enviar el glitch
-void perform_glitch() {
-    while (!gpio_get(POST_PIN)) {
-        sleep_us(1); // Polling simple
-    }
-
-    sleep_us(GLITCH_DELAY_US);
-    send_glitch_pulse();
+// Inicializar PIO
+void init_glitch_pio() {
+    uint offset = pio_add_program(glitch_pio, &glitch_program);
+    pio_sm_config cfg = glitch_program_get_default_config(offset);
+    
+    sm_config_set_out_pins(&cfg, GLITCH_OUT_PIN, 1);
+    sm_config_set_clkdiv(&cfg, 1.0);  // 125 MHz → 8 ns/ciclo
+    
+    pio_sm_init(glitch_pio, glitch_sm, offset, &cfg);
+    pio_sm_set_enabled(glitch_pio, glitch_sm, true);
 }
 
 int main() {
-    // Configurar el reloj manualmente
-    set_sys_clock_khz(125000, true);
-
-    glitch_init();
-    pico_led_init();  // Inicializar LED
-
-    while (true) {
-        perform_glitch();
-        sleep_ms(1000); // 1 segundo entre intentos
+    // Inicializar hardware (sin stdio)
+    gpio_init(CPU_RESET_PIN);
+    gpio_init(GLITCH_OUT_PIN);
+    gpio_init(LED_PIN);    
+    
+    gpio_set_dir(CPU_RESET_PIN, GPIO_IN);
+    gpio_set_dir(GLITCH_OUT_PIN, GPIO_OUT);
+    gpio_set_dir(LED_PIN, GPIO_OUT);    
+    
+    // Configurar interrupción
+    gpio_set_irq_enabled_with_callback(CPU_RESET_PIN, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
+    
+    // Iniciar PIO
+    init_glitch_pio();
+    
+    // Bucle principal
+    while(1) {
+        if(trigger_glitch) {
+            // Parpadear LED verde (glitch activo)
+            gpio_put(LED_PIN, 1);  // Enciende el LED            
+            pio_sm_put_blocking(glitch_pio, glitch_sm, GLITCH_DELAY_CYCLES);
+            pio_sm_put_blocking(glitch_pio, glitch_sm, GLITCH_WIDTH_CYCLES);
+            gpio_put(LED_PIN, 0);  // Apaga el LED
+            trigger_glitch = false;
+        } else {
+            // LED rojo cuando no hay glitch
+            gpio_put(LED_PIN, 0);  // Apaga el LED verde            
+        }
+        
+        __wfi();  // Pone el microcontrolador en modo de espera activa
     }
 }
