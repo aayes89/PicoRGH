@@ -44,6 +44,11 @@
 
 Pueden encontrar más puntos de conexión en la siguiente dirección: <a href="https://consolemods.org/wiki/Xbox_360:Alternate_Solder_Points">Console Mods</a>
 
+# Por hacer
+* Utilizar el modelo Raspberry Pi Pico W para depurar los códigos POST vía inalámbrica.
+* Buscar puntos de conexión menos invasivos o de fácil acceso para no tener que desarmar la consola completamente.
+ 
+
 # Descarga de responsabilidad
 <p>
 El objetivo de este proyecto es meramente educativo, sin fines de lucro y no tiene ningún respaldo comprobado hasta este instante. En la medida que pueda ser probado y mejorado, podrá dar cuenta de ello según vaya obteniendo resultados, los cuales, serán reflejados en las próximas versiones. En caso de que consiga un resultado satisfactorio, no tengo intención de continuar mejorándolo para otras consolas.<br>
