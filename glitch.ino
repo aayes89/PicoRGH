@@ -56,7 +56,15 @@ void loop() {
       last_post = current_post;
     }
 
-    // Si detectamos 0x51, por ejemplo, disparamos glitch
+    // Si detectamos 0x51, disparamos glitch
+    // Indagar más códigos POST con referencia al CB
+    /*
+      Código POST	DE XBOX 360 - Significado aproximado
+      0x50	Carga CB (Bootloader 2BL)
+      0x51	Validación de CB
+      0x52	Inicio de 2BL ejecutable
+      0x53	Preparación del kernel
+   */
     if (current_post == 0x51 && !glitch_fired) {
       generate_glitch();
       glitch_fired = true;
@@ -68,7 +76,7 @@ void loop() {
 
 // Suponiendo que POST_PIN tiene los 8 bits en un latch (mejor usar 8 GPIOs)
 uint8_t read_post_code() {
-  // Aquí deberías leer todos los pines conectados a POST_OUT[7:0]
-  // Versión de prueba si solo estás usando 1 pin (para lógica más simple)
+  // leer todos los pines conectados a POST_OUT[7:0]
+  // Versión de prueba usando 1 pin (para lógica más simple)
   return digitalRead(POST_PIN);  // ¡Esto debe mejorarse a múltiples bits!
 }
