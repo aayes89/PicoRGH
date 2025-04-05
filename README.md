@@ -1,7 +1,8 @@
 # PicoRGH
 <p>
   Conversión del timing en formato xsvf creado por @Octal450 para RGH en la Xbox 360 placa Xenon utilizando una Raspberry Pi Pico. (RPI-Pico) <br>
-  Sólo necesita de 4 cables. (hasta el momento)
+  Sólo necesita de 4 cables. (hasta el momento) <br>
+  Adecuación en código Arduino compatible con Raspberry Pi Pico para realizar un glitch cuando detecta cierto código POST.
 </p>
 
 # Conexiones
